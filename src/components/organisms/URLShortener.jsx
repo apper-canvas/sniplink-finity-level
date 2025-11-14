@@ -1,12 +1,11 @@
-import React, { useState } from 'react'
-import { toast } from 'react-toastify'
-import { motion, AnimatePresence } from 'framer-motion'
-import ApperIcon from '@/components/ApperIcon'
-import Button from '@/components/atoms/Button'
-import Input from '@/components/atoms/Input'
-import Card from '@/components/atoms/Card'
-import { shortenedLinkService } from '@/services/api/shortenedLinkService'
-
+import React, { useState } from "react";
+import { toast } from "react-toastify";
+import { AnimatePresence, motion } from "framer-motion";
+import { shortenedLinkService } from "@/services/api/shortenedLinkService";
+import ApperIcon from "@/components/ApperIcon";
+import Button from "@/components/atoms/Button";
+import Card from "@/components/atoms/Card";
+import Input from "@/components/atoms/Input";
 const URLShortener = () => {
   const [formData, setFormData] = useState({
     originalUrl: '',
@@ -25,7 +24,7 @@ const URLShortener = () => {
     }
   }
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault()
     
     // Reset previous state
@@ -41,17 +40,13 @@ const URLShortener = () => {
     }
     
     if (formData.customAlias.trim()) {
-      const existingLinks = shortenedLinkService.getAll()
+      const existingLinks = await shortenedLinkService.getAll()
       const aliasExists = existingLinks.some(link => 
         link.shortCode === formData.customAlias.trim().toLowerCase() || 
         link.customAlias === formData.customAlias.trim().toLowerCase()
       )
       if (aliasExists) {
-        newErrors.customAlias = "This alias is already taken"
-      } else if (!/^[a-zA-Z0-9-_]+$/.test(formData.customAlias.trim())) {
-        newErrors.customAlias = "Alias can only contain letters, numbers, hyphens, and underscores"
-      } else if (formData.customAlias.trim().length < 3) {
-        newErrors.customAlias = "Alias must be at least 3 characters long"
+        newErrors.customAlias = "This custom alias is already taken"
       }
     }
     
@@ -60,14 +55,12 @@ const URLShortener = () => {
       return
     }
     
-    setLoading(true)
-    
     try {
+      setLoading(true)
       const linkData = {
         originalUrl: formData.originalUrl.trim(),
-        customAlias: formData.customAlias.trim() || null
+        customAlias: formData.customAlias.trim() || undefined
       }
-      
       const newLink = await shortenedLinkService.create(linkData)
       setGeneratedLink(newLink)
       setFormData({ originalUrl: '', customAlias: '' })
@@ -76,7 +69,7 @@ const URLShortener = () => {
       // Trigger page refresh for header counter
       window.dispatchEvent(new Event('storage'))
     } catch (error) {
-      toast.error("Failed to create short link. Please try again.")
+      toast.error(error?.message || "Failed to create short link. Please try again.")
     } finally {
       setLoading(false)
     }

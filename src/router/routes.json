@@ -1,0 +1,26 @@
+{
+  "/": {
+    "allow": {
+      "when": {
+        "conditions": [
+          {
+            "label": "Homepage is public",
+            "rule": "public"
+          }
+        ]
+      }
+    }
+  },
+  "*": {
+    "allow": {
+      "when": {
+        "conditions": [
+          {
+            "label": "NotFound page is public",
+            "rule": "public"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,6 +1,4 @@
-import mockLinks from '@/services/mockData/shortenedLinks.json'
-
-const STORAGE_KEY = 'sniplink-data'
+import { getApperClient } from '@/services/apperClient'
 
 // Helper function to generate random short codes
 const generateShortCode = (length = 6) => {
@@ -12,114 +10,256 @@ const generateShortCode = (length = 6) => {
   return result
 }
 
-// Helper function to get data from localStorage with fallback to mock data
-const getData = () => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      return JSON.parse(stored)
-    }
-    // Initialize with mock data on first load
-    const initialData = [...mockLinks]
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initialData))
-    return initialData
-  } catch {
-    return [...mockLinks]
-  }
-}
-
-// Helper function to save data to localStorage
-const saveData = (data) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch (error) {
-    console.error('Failed to save to localStorage:', error)
-  }
-}
-
-// Add delay to simulate API calls
-const delay = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms))
-
 export const shortenedLinkService = {
   async getAll() {
-    await delay()
-    return getData()
+    try {
+      const apperClient = getApperClient()
+      if (!apperClient) {
+        throw new Error('ApperClient not available')
+      }
+
+      const response = await apperClient.fetchRecords('shortened_link_c', {
+        fields: [
+          { field: { Name: 'Name' } },
+          { field: { Name: 'original_url_c' } },
+          { field: { Name: 'custom_alias_c' } },
+          { field: { Name: 'clicks_c' } },
+          { field: { Name: 'short_code_c' } },
+          { field: { Name: 'is_active_c' } },
+          { field: { Name: 'CreatedOn' } },
+          { field: { Name: 'last_clicked_at_c' } }
+        ],
+        orderBy: [{ fieldName: 'CreatedOn', sorttype: 'DESC' }],
+        pagingInfo: { limit: 100, offset: 0 }
+      })
+
+      if (!response?.success) {
+        console.error('Failed to fetch records:', response?.message || 'Unknown error')
+        return []
+      }
+
+      return (response.data || []).map(record => ({
+        Id: record.Id,
+        Name: record.Name,
+        originalUrl: record.original_url_c,
+        customAlias: record.custom_alias_c,
+        clicks: record.clicks_c || 0,
+        shortCode: record.short_code_c,
+        isActive: record.is_active_c,
+        createdAt: record.CreatedOn,
+        lastClickedAt: record.last_clicked_at_c
+      }))
+    } catch (error) {
+      console.error('Error fetching all links:', error?.message || error)
+      return []
+    }
   },
 
   async getById(id) {
-    await delay()
-    const data = getData()
-    return data.find(link => link.Id === parseInt(id))
+    try {
+      const apperClient = getApperClient()
+      if (!apperClient) {
+        throw new Error('ApperClient not available')
+      }
+
+      const response = await apperClient.getRecordById('shortened_link_c', parseInt(id), {
+        fields: [
+          { field: { Name: 'Name' } },
+          { field: { Name: 'original_url_c' } },
+          { field: { Name: 'custom_alias_c' } },
+          { field: { Name: 'clicks_c' } },
+          { field: { Name: 'short_code_c' } },
+          { field: { Name: 'is_active_c' } },
+          { field: { Name: 'CreatedOn' } },
+          { field: { Name: 'last_clicked_at_c' } }
+        ]
+      })
+
+      if (!response?.data) {
+        return null
+      }
+
+      return {
+        Id: response.data.Id,
+        Name: response.data.Name,
+        originalUrl: response.data.original_url_c,
+        customAlias: response.data.custom_alias_c,
+        clicks: response.data.clicks_c || 0,
+        shortCode: response.data.short_code_c,
+        isActive: response.data.is_active_c,
+        createdAt: response.data.CreatedOn,
+        lastClickedAt: response.data.last_clicked_at_c
+      }
+    } catch (error) {
+      console.error('Error fetching record by ID:', error?.message || error)
+      return null
+    }
   },
 
   async create(linkData) {
-    await delay()
-    const data = getData()
-    
-    // Find highest existing Id and add 1
-    const maxId = data.length > 0 ? Math.max(...data.map(link => link.Id)) : 0
-    
-    // Generate unique short code
-    let shortCode
-    if (linkData.customAlias) {
-      shortCode = linkData.customAlias.toLowerCase()
-    } else {
-      do {
+    try {
+      const apperClient = getApperClient()
+      if (!apperClient) {
+        throw new Error('ApperClient not available')
+      }
+
+      // Generate unique short code
+      let shortCode
+      if (linkData.customAlias) {
+        shortCode = linkData.customAlias.toLowerCase()
+      } else {
         shortCode = generateShortCode()
-      } while (data.some(link => link.shortCode === shortCode))
+      }
+
+      const recordPayload = {
+        records: [
+          {
+            Name: shortCode,
+            original_url_c: linkData.originalUrl,
+            custom_alias_c: linkData.customAlias || '',
+            short_code_c: shortCode,
+            clicks_c: 0,
+            is_active_c: true,
+            last_clicked_at_c: null
+          }
+        ]
+      }
+
+      const response = await apperClient.createRecord('shortened_link_c', recordPayload)
+
+      if (!response?.success) {
+        console.error('Failed to create record:', response?.message || 'Unknown error')
+        throw new Error(response?.message || 'Failed to create shortened link')
+      }
+
+      if (response.results) {
+        const successful = response.results.filter(r => r.success)
+        const failed = response.results.filter(r => !r.success)
+
+        if (failed.length > 0) {
+          console.error(`Failed to create ${failed.length} records:`, failed)
+          const errorMsg = failed[0]?.message || 'Failed to create shortened link'
+          throw new Error(errorMsg)
+        }
+
+        if (successful.length > 0) {
+          const created = successful[0].data
+          return {
+            Id: created.Id,
+            Name: created.Name,
+            originalUrl: created.original_url_c,
+            customAlias: created.custom_alias_c,
+            clicks: created.clicks_c || 0,
+            shortCode: created.short_code_c,
+            isActive: created.is_active_c,
+            createdAt: created.CreatedOn,
+            lastClickedAt: created.last_clicked_at_c
+          }
+        }
+      }
+
+      throw new Error('No records created')
+    } catch (error) {
+      console.error('Error creating link:', error?.message || error)
+      throw error
     }
-    
-    const newLink = {
-      Id: maxId + 1,
-      id: `link-${maxId + 1}`,
-      shortCode: shortCode,
-      originalUrl: linkData.originalUrl,
-      customAlias: linkData.customAlias || null,
-      clicks: 0,
-      createdAt: new Date().toISOString(),
-      lastClickedAt: null,
-      isActive: true
-    }
-    
-    data.push(newLink)
-    saveData(data)
-    return newLink
   },
 
   async update(id, updateData) {
-    await delay()
-    const data = getData()
-    const index = data.findIndex(link => link.Id === parseInt(id))
-    
-    if (index === -1) {
-      throw new Error('Link not found')
+    try {
+      const apperClient = getApperClient()
+      if (!apperClient) {
+        throw new Error('ApperClient not available')
+      }
+
+      const payload = {
+        records: [
+          {
+            Id: parseInt(id),
+            ...(updateData.clicks_c !== undefined && { clicks_c: updateData.clicks_c }),
+            ...(updateData.last_clicked_at_c !== undefined && { last_clicked_at_c: updateData.last_clicked_at_c }),
+            ...(updateData.is_active_c !== undefined && { is_active_c: updateData.is_active_c })
+          }
+        ]
+      }
+
+      const response = await apperClient.updateRecord('shortened_link_c', payload)
+
+      if (!response?.success) {
+        console.error('Failed to update record:', response?.message || 'Unknown error')
+        throw new Error(response?.message || 'Failed to update link')
+      }
+
+      if (response.results) {
+        const successful = response.results.filter(r => r.success)
+        const failed = response.results.filter(r => !r.success)
+
+        if (failed.length > 0) {
+          console.error(`Failed to update ${failed.length} records:`, failed)
+        }
+
+        if (successful.length > 0) {
+          const updated = successful[0].data
+          return {
+            Id: updated.Id,
+            Name: updated.Name,
+            originalUrl: updated.original_url_c,
+            customAlias: updated.custom_alias_c,
+            clicks: updated.clicks_c || 0,
+            shortCode: updated.short_code_c,
+            isActive: updated.is_active_c,
+            createdAt: updated.CreatedOn,
+            lastClickedAt: updated.last_clicked_at_c
+          }
+        }
+      }
+
+      throw new Error('Failed to update record')
+    } catch (error) {
+      console.error('Error updating link:', error?.message || error)
+      throw error
     }
-    
-    data[index] = { ...data[index], ...updateData }
-    saveData(data)
-    return data[index]
   },
 
   async delete(id) {
-    await delay()
-    const data = getData()
-    const filteredData = data.filter(link => link.id !== id)
-    saveData(filteredData)
-    return true
+    try {
+      const apperClient = getApperClient()
+      if (!apperClient) {
+        throw new Error('ApperClient not available')
+      }
+
+      const response = await apperClient.deleteRecord('shortened_link_c', {
+        RecordIds: [parseInt(id)]
+      })
+
+      if (!response?.success) {
+        console.error('Failed to delete record:', response?.message || 'Unknown error')
+        throw new Error(response?.message || 'Failed to delete link')
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error deleting link:', error?.message || error)
+      throw error
+    }
   },
 
   async incrementClicks(linkId) {
-    await delay(100)
-    const data = getData()
-    const linkIndex = data.findIndex(link => link.id === linkId)
-    
-    if (linkIndex !== -1) {
-      data[linkIndex].clicks += 1
-      data[linkIndex].lastClickedAt = new Date().toISOString()
-      saveData(data)
-      return data[linkIndex]
+    try {
+      const link = await this.getById(linkId)
+      if (!link) {
+        throw new Error('Link not found')
+      }
+
+      const updated = await this.update(linkId, {
+        clicks_c: (link.clicks || 0) + 1,
+        last_clicked_at_c: new Date().toISOString()
+      })
+
+      return updated
+    } catch (error) {
+      console.error('Error incrementing clicks:', error?.message || error)
+      throw error
     }
-    
-    throw new Error('Link not found')
   }
 }

@@ -10,7 +10,6 @@ import Empty from '@/components/ui/Empty'
 import Loading from '@/components/ui/Loading'
 import ErrorView from '@/components/ui/ErrorView'
 import { shortenedLinkService } from '@/services/api/shortenedLinkService'
-
 const LinkHistory = () => {
   const [links, setLinks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -20,8 +19,8 @@ const LinkHistory = () => {
     setLoading(true)
     setError('')
     try {
-      const allLinks = await shortenedLinkService.getAll()
-      setLinks(allLinks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)))
+const allLinks = await shortenedLinkService.getAll()
+      setLinks(allLinks || [])
     } catch (err) {
       setError('Failed to load link history')
     } finally {
@@ -58,8 +57,8 @@ const LinkHistory = () => {
 
   const handleClick = async (linkId) => {
     try {
-      await shortenedLinkService.incrementClicks(linkId)
-      loadLinks() // Refresh to show updated click count
+await shortenedLinkService.incrementClicks(linkId)
+      await loadLinks()
     } catch (err) {
       console.error('Failed to track click:', err)
     }
@@ -69,8 +68,9 @@ const LinkHistory = () => {
     if (!window.confirm('Are you sure you want to delete this link?')) return
     
     try {
-      await shortenedLinkService.delete(linkId)
+await shortenedLinkService.delete(linkId)
       toast.success("Link deleted successfully!")
+      await loadLinks()
       loadLinks()
       // Trigger header refresh
       window.dispatchEvent(new Event('storage'))
@@ -104,13 +104,13 @@ const LinkHistory = () => {
 
       <div className="space-y-4">
         <AnimatePresence>
-          {links.map((link, index) => {
+{links.map((link, index) => {
             const shortUrl = `https://snip.link/${link.shortCode}`
             const createdTime = formatDistanceToNow(new Date(link.createdAt), { addSuffix: true })
             
             return (
               <motion.div
-                key={link.id}
+                key={link.Id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
@@ -124,7 +124,7 @@ const LinkHistory = () => {
                         <div className="flex items-center space-x-3">
                           <div 
                             className="text-lg font-bold text-primary cursor-pointer hover:text-secondary transition-colors duration-200"
-                            onClick={() => handleClick(link.id)}
+                            onClick={() => handleClick(link.Id)}
                           >
                             {shortUrl}
                           </div>
@@ -174,7 +174,7 @@ const LinkHistory = () => {
                     </div>
                     
                     {/* Custom alias indicator */}
-                    {link.customAlias && (
+{link.customAlias && (
                       <div className="flex items-center space-x-2">
                         <Badge variant="secondary" size="sm">
                           <ApperIcon name="Edit3" className="w-3 h-3 mr-1" />

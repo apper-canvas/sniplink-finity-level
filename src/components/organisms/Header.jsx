@@ -1,7 +1,7 @@
-import React from 'react'
-import ApperIcon from '@/components/ApperIcon'
+import React from "react";
+import ApperIcon from "@/components/ApperIcon";
 
-const Header = () => {
+const Header = ({ linkCount = 0 }) => {
   return (
     <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
@@ -17,16 +17,16 @@ const Header = () => {
               <p className="text-sm text-gray-600">URL Shortener</p>
             </div>
           </div>
-          <div className="text-right">
+<div className="text-right">
             <div className="text-sm text-gray-500">Total Links</div>
             <div className="text-2xl font-bold text-primary">
-              {JSON.parse(localStorage.getItem('sniplink-data') || '[]').length}
+              {linkCount}
             </div>
           </div>
         </div>
       </div>
     </header>
-  )
-}
+);
+};
 
-export default Header
+export default Header;
